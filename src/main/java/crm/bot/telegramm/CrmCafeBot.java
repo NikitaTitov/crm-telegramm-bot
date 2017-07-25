@@ -6,7 +6,6 @@ import org.telegram.telegrambots.api.objects.Update;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -27,57 +26,29 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 			long chatId = update.getMessage().getChatId();
 
 			if (messageText.equalsIgnoreCase("/auth") && authDetails.containsKey("username") && authDetails.containsKey("password")) {
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Вы уже авторизованы, чтобы перезайти под другим пользователем наберите команду /clean");
-				try {
-					sendMessage(message);
-				} catch (TelegramApiException e) {
-					e.printStackTrace();
-				}
+				sendMessageWithText(chatId, "Вы уже авторизованы, чтобы перезайти под другим пользователем наберите команду /clean");
 				return;
 			}
 
 			//если у нас нет записи о том что мы заходили в меню аунтификации
 			if (!(context.containsValue("/auth")) && messageText.equalsIgnoreCase("/auth")) {
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Введите логин");
+				sendMessageWithText(chatId, "Введите логин");
 				context.put(chatId, messageText);
-				try {
-					sendMessage(message);
-				} catch (TelegramApiException e) {
-					e.printStackTrace();
-				}
 				return;
 			}
 
 			if (context.containsValue("/auth") && !authDetails.containsKey("username")) {
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Введите пароль");
+				sendMessageWithText(chatId, "Введите пароль");
 				authDetails.put("username", messageText);
-				try {
-					sendMessage(message);
-				} catch (TelegramApiException e) {
-					e.printStackTrace();
-				}
 				return;
 			}
 
 			if (context.containsValue("/auth") && authDetails.containsKey("username")) {
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Сохранено, выберите стол /chooseTable");
+				sendMessageWithText(chatId, "Сохранено, выберите стол /chooseTable");
 				authDetails.put("password", messageText);
 				sessionHandler.setAuthDetails(authDetails);
 				//выходим из меню заполнения логина пароля
 				context.clear();
-				try {
-					sendMessage(message);
-				} catch (TelegramApiException e) {
-					e.printStackTrace();
-				}
 				return;
 			}
 
@@ -87,50 +58,25 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 					messageText.equalsIgnoreCase("/chooseTable") &&
 					!context.containsValue("/chooseTable")) {
 
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Выберите стол" + "\n" + sessionHandler.getStringOfBoards());
+				sendMessageWithText(chatId, "Выберите стол" + "\n" + sessionHandler.getStringOfBoards());
 				context.put(chatId, messageText);
-				try {
-					sendMessage(message);
-				} catch (TelegramApiException e) {
-					e.printStackTrace();
-				}
-			} else if (context.containsValue("/chooseTable") && !tableDetails.containsKey("boardId")) {
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardById(messageText));
-				tableDetails.put("boardId", messageText);
-				try {
-					sendMessage(message);
-				} catch (TelegramApiException e) {
-					e.printStackTrace();
-				}
-			} else if (tableDetails.containsKey("boardId") && !tableDetails.containsKey("number")) {
 
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Введите описание стола(Оно может быть пустым)");
+			} else if (context.containsValue("/chooseTable") && !tableDetails.containsKey("boardId")) {
+				sendMessageWithText(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardById(messageText));
+				tableDetails.put("boardId", messageText);
+
+			} else if (tableDetails.containsKey("boardId") && !tableDetails.containsKey("number")) {
+				sendMessageWithText(chatId, "Введите описание стола(Оно не может быть пустым)");
 				tableDetails.put("number", messageText);
-				try {
-					sendMessage(message);
-				} catch (TelegramApiException e) {
-					e.printStackTrace();
-				}
+
 			} else if (context.containsValue("/chooseTable") &&
 					tableDetails.containsKey("boardId") &&
 					tableDetails.containsKey("number")) {
 
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Счёт добавлен в систему");
+				sendMessageWithText(chatId, "Счёт добавлен в систему");
+
 				tableDetails.put("description", messageText);
-				try {
-					sendMessage(message);
-					sessionHandler.sendRequestOnAddTable(tableDetails);
-				} catch (TelegramApiException | IOException e) {
-					e.printStackTrace();
-				}
+				sessionHandler.sendRequestOnAddTable(tableDetails);
 				//выходим из меню, но остаётся аунтификация
 				context.clear();
 				tableDetails.clear();
@@ -141,15 +87,21 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 				authDetails.clear();
 				tableDetails.clear();
 
-				SendMessage message = new SendMessage()
-						.setChatId(chatId)
-						.setText("Все настройки сброшены");
-				try {
-					sendMessage(message);
-				} catch (TelegramApiException e) {
-					e.printStackTrace();
-				}
+				sendMessageWithText(chatId, "Все настройки сброшены");
 			}
+
+		}
+	}
+
+	private void sendMessageWithText(Long chatId, String text) {
+
+		SendMessage message = new SendMessage()
+				.setChatId(chatId)
+				.setText(text);
+		try {
+			sendMessage(message);
+		} catch (TelegramApiException e) {
+			e.printStackTrace();
 		}
 	}
 

@@ -13,6 +13,8 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
@@ -25,9 +27,9 @@ import java.util.stream.Collectors;
 
 public class HttpSessionHandler {
 
-	Map<String, String> authDetails;
+	private Map<String, String> authDetails;
 
-	Logger logger;
+	final static Logger logger = LogManager.getRootLogger();
 
 	public HttpSessionHandler() {
 
@@ -92,7 +94,7 @@ public class HttpSessionHandler {
 		return getListOfBoards().get(Integer.valueOf(id) - 1);
 	}
 
-	public void sendRequestOnAddTable(Map<String, String> tableDetails) throws IOException {
+	public void sendRequestOnAddTable(Map<String, String> tableDetails) {
 
 		HttpClient httpClient = connectToServer();
 		HttpPost httpPost = new HttpPost("http://localhost:8080/manager/add-calculate");
@@ -102,19 +104,25 @@ public class HttpSessionHandler {
 		params.add(new BasicNameValuePair("boardId", tableDetails.get("boardId")));
 		params.add(new BasicNameValuePair("number", tableDetails.get("number")));
 		params.add(new BasicNameValuePair("description", tableDetails.get("description")));
-		httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
 
-		HttpResponse response = httpClient.execute(httpPost);
-		HttpEntity entity = response.getEntity();
+		try {
+			httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+			HttpResponse response = httpClient.execute(httpPost);
+			HttpEntity entity = response.getEntity();
 
-		if (entity != null) {
-			InputStream instream = entity.getContent();
-			try {
-				// do something useful
-			} finally {
-				instream.close();
+			if (entity != null) {
+				InputStream instream = entity.getContent();
+				try {
+					// do something useful
+				} finally {
+					instream.close();
+				}
 			}
+		} catch (IOException e) {
+			logger.error("IOException: " + e.getLocalizedMessage());
 		}
+
+
 	}
 
 
