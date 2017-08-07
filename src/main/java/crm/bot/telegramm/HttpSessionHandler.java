@@ -110,14 +110,7 @@ public class HttpSessionHandler {
 			HttpResponse response = httpClient.execute(httpPost);
 			HttpEntity entity = response.getEntity();
 
-			if (entity != null) {
-				InputStream instream = entity.getContent();
-				try {
-					// do something useful
-				} finally {
-					instream.close();
-				}
-			}
+			EntityUtils.consume(entity);
 		} catch (IOException e) {
 			logger.error("IOException: " + e.getLocalizedMessage());
 		}
@@ -125,6 +118,48 @@ public class HttpSessionHandler {
 
 	}
 
+	public void sendEditClientTimeStart(Map<String, String> tableDetails) {
+		HttpClient httpClient = connectToServer();
+		HttpPost httpPost = new HttpPost("http://localhost:8080/manager/edit-client-time-start");
 
+		//Этот метод вызывается после отправки клиентов на сервер и затем меняет время, поэтому getClientLastId возвращает последний ID учитывая новые
+		int nextIdAfterLastClientId = getClientLastId() + 1;
+		int amountOfNewClients = Integer.parseInt(tableDetails.get("number"));
+		int nextPositionAfterOldClientId = nextIdAfterLastClientId - amountOfNewClients;//
 
+		for (int i = nextPositionAfterOldClientId; i < nextIdAfterLastClientId; ++i){
+			List<NameValuePair> params = new ArrayList<>(2);
+			String clientId = String.valueOf(i);
+
+			params.add(new BasicNameValuePair("clientId", clientId));
+			params.add(new BasicNameValuePair("hours", tableDetails.get("hours")));
+			params.add(new BasicNameValuePair("minutes", tableDetails.get("minutes")));
+
+			try {
+				httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+				EntityUtils.consume(httpClient.execute(httpPost).getEntity());//release connection
+			} catch (ClientProtocolException e) {
+				logger.error("Problem with protocol: " + e.getLocalizedMessage());
+			} catch (IOException e) {
+				logger.error("IOException: " + e.getLocalizedMessage());
+			}
+		}
+
+	}
+
+	private int getClientLastId() {
+		int lastId = 0;
+		HttpClient httpClient = connectToServer();
+		HttpGet httpGet = new HttpGet("http://localhost:8080/manager/rest/clientsNumber");
+
+		try {
+			HttpResponse response = httpClient.execute(httpGet);
+			 lastId = Integer.parseInt(EntityUtils.toString(response.getEntity(), "UTF-8"));
+		} catch (ClientProtocolException e) {
+			logger.error("Problem with protocol: " + e.getLocalizedMessage());
+		} catch (IOException e) {
+			logger.error("IOException: " + e.getLocalizedMessage());
+		}
+		return lastId;
+	}
 }

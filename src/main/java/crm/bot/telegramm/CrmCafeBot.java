@@ -27,6 +27,10 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 			String messageText = update.getMessage().getText();
 			long chatId = update.getMessage().getChatId();
 
+			if (messageText.equalsIgnoreCase("/start")) {
+				sendMessageWithText(chatId, "Вам нужно пройти аунтификацию при помощи команды: " + "\n" + "/auth");
+			}
+
 			if (messageText.equalsIgnoreCase("/Out")) {
 				context.clear();
 				authDetails.clear();
@@ -82,8 +86,12 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 				sendMessageWithText(chatId, "/Cancel");
 				tableDetails.put("boardId", messageText);
 
-			} else if (tableDetails.containsKey("boardId") && !tableDetails.containsKey("number") && !(messageText.equalsIgnoreCase("/Yes") || messageText.equalsIgnoreCase("/No"))) {
-				sendMessageWithText(chatId, "Хотите добавить описание стола?" + "\n" + "/Yes" + "\n" + "/No");
+			} else if (tableDetails.containsKey("boardId") &&
+					!tableDetails.containsKey("number") &&
+					!(messageText.equalsIgnoreCase("/Yes") ||
+							messageText.equalsIgnoreCase("/No"))) {
+
+				sendMessageWithText(chatId, "Хотите добавить описание стола?" + "\n" + "/Yes" + "\n" + "/No" + "\n" + "\n" + "/Cancel");
 				tableDetails.put("number", messageText);
 
 			} else if (tableDetails.containsKey("boardId") &&
@@ -98,29 +106,65 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 					tableDetails.containsKey("number") &&
 					messageText.equalsIgnoreCase("/No")) {
 
-				sendMessageWithText(chatId, "Счёт добавлен в систему");
+				sendMessageWithText(chatId, "Хотите изменить время посадки?" + "\n" + "/Change" + "\n" + "/Stay" + "\n" + "\n" + "/Cancel");
 
 				tableDetails.put("description", "");
+
+			} else if (context.contains("/chooseTable") &&
+					tableDetails.containsKey("boardId") &&
+					tableDetails.containsKey("number") &&
+					context.contains("/Yes") &&
+					!context.contains("/Change") &&
+					!(messageText.equalsIgnoreCase("/Change") ||
+							messageText.equalsIgnoreCase("/Stay"))) {
+
+				sendMessageWithText(chatId, "Хотите изменить время посадки?" + "\n" + "/Change" + "\n" + "/Stay" + "\n" + "\n" + "/Cancel");
+
+				tableDetails.put("description", messageText);
+
+			} else if (context.contains("/chooseTable") &&
+					tableDetails.containsKey("boardId") &&
+					tableDetails.containsKey("number") &&
+					messageText.equalsIgnoreCase("/Change")) {
+
+				sendMessageWithText(chatId, "Введите новое время в формате Часы:Минуты");
+				context.add("/Change");
+
+			} else if (context.contains("/chooseTable") &&
+					tableDetails.containsKey("boardId") &&
+					tableDetails.containsKey("number") &&
+					messageText.equalsIgnoreCase("/Stay")) {
+
 				sessionHandler.sendRequestOnAddTable(tableDetails);
+
+				sendMessageWithText(chatId, "Счёт добавлен в систему");
 				//выходим из меню, но остаётся аунтификация
 				context.clear();
 				tableDetails.clear();
 			} else if (context.contains("/chooseTable") &&
 					tableDetails.containsKey("boardId") &&
 					tableDetails.containsKey("number") &&
-					context.contains("/Yes")) {
+					context.contains("/Change")) {
+
+
+				sessionHandler.sendRequestOnAddTable(tableDetails);
+				sessionHandler.sendEditClientTimeStart(parceInputTime(messageText, tableDetails));
 
 				sendMessageWithText(chatId, "Счёт добавлен в систему");
-
-				tableDetails.put("description", "");
-				sessionHandler.sendRequestOnAddTable(tableDetails);
 				//выходим из меню, но остаётся аунтификация
 				context.clear();
 				tableDetails.clear();
 			}
-
-
 		}
+	}
+
+	private Map<String, String> parceInputTime(String hoursMinutes, Map<String, String> tableDetails) {
+
+		String[] parceTime = hoursMinutes.split(":", 2);
+		tableDetails.put("hours", parceTime[0]);
+		tableDetails.put("minutes", parceTime[1]);
+
+		return tableDetails;
 	}
 
 	private void sendMessageWithText(Long chatId, String text) {
