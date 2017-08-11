@@ -6,10 +6,13 @@ import org.telegram.telegrambots.api.objects.Update;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class CrmCafeBot extends TelegramLongPollingBot {
 
@@ -29,6 +32,7 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 
 			if (messageText.equalsIgnoreCase("/start")) {
 				sendMessageWithText(chatId, "Вам нужно пройти аунтификацию при помощи команды: " + "\n" + "/auth");
+				return;
 			}
 
 			if (messageText.equalsIgnoreCase("/Out")) {
@@ -36,17 +40,19 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 				authDetails.clear();
 				tableDetails.clear();
 
-				sendMessageWithText(chatId, "Все настройки сброшены");
+				sendMessageWithText(chatId, "Все настройки сброшены чтобы началь работу авторизуйтесь: " + "\n" + "/auth");
+				return;
 			}
 
 			if (messageText.equalsIgnoreCase("/Cancel")) {
 				context.clear();
 				tableDetails.clear();
-				messageText = "/chooseTable";
+				printMainMenu(chatId);
+				return;
 			}
 
 			if (messageText.equalsIgnoreCase("/auth") && authDetails.containsKey("username") && authDetails.containsKey("password")) {
-				sendMessageWithText(chatId, "Вы уже авторизованы, чтобы перезайти под другим пользователем наберите команду /clean");
+				sendMessageWithText(chatId, "Вы уже авторизованы, чтобы перезайти под другим пользователем наберите команду /Out");
 				return;
 			}
 
@@ -63,12 +69,17 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 				return;
 			}
 
-			if (context.contains("/auth") && authDetails.containsKey("username")) {
-				sendMessageWithText(chatId, "Сохранено, выберите стол " + "\n" + "/chooseTable");
+			if (context.contains("/auth") && authDetails.containsKey("username") && !messageText.equalsIgnoreCase("/chooseTable")) {
 				authDetails.put("password", messageText);
 				sessionHandler.setAuthDetails(authDetails);
-				//выходим из меню заполнения логина пароля
-				context.clear();
+				if (sessionHandler.isLoginPasswordCorrect()) {
+					printMainMenu(chatId);
+					context.clear();
+				} else {
+					sendMessageWithText(chatId, "Вы ввели неправильный логин/пароль попробуйте заново при помощи команды /auth");
+					authDetails.clear();
+					context.clear();
+				}
 				return;
 			}
 
@@ -78,39 +89,57 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 					messageText.equalsIgnoreCase("/chooseTable") &&
 					!context.contains("/chooseTable")) {
 
-				sendMessageWithText(chatId, "Выберите стол" + "\n" + sessionHandler.getStringOfBoards());
+				try {
+					sendMessageWithText(chatId, "Выберите стол" + "\n" + sessionHandler.getStringOfBoards());
+				} catch (IOException e) {
+					sendMessageWithText(chatId, "Смена еще не началась");
+					return;
+				}
 				context.add(messageText);
+				return;
+			}
 
-			} else if (context.contains("/chooseTable") && !tableDetails.containsKey("boardId")) {
-				sendMessageWithText(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardById(messageText));
-				sendMessageWithText(chatId, "/Cancel");
+			if (context.contains("/chooseTable") && !tableDetails.containsKey("boardId")) {
+				try {
+					sendMessageWithText(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardById(messageText) + "\n" + "/Cancel");
+				} catch (IOException e) {
+					sendMessageWithText(chatId, "Смена еще не началась");
+					return;
+				}
 				tableDetails.put("boardId", messageText);
+				return;
+			}
 
-			} else if (tableDetails.containsKey("boardId") &&
+			if (tableDetails.containsKey("boardId") &&
 					!tableDetails.containsKey("number") &&
 					!(messageText.equalsIgnoreCase("/Yes") ||
 							messageText.equalsIgnoreCase("/No"))) {
 
 				sendMessageWithText(chatId, "Хотите добавить описание стола?" + "\n" + "/Yes" + "\n" + "/No" + "\n" + "\n" + "/Cancel");
 				tableDetails.put("number", messageText);
+				return;
+			}
 
-			} else if (tableDetails.containsKey("boardId") &&
+			if (tableDetails.containsKey("boardId") &&
 					tableDetails.containsKey("number") &&
 					messageText.equalsIgnoreCase("/Yes")) {
 
 				sendMessageWithText(chatId, "Введите описание стола");
 				context.add("/Yes");
+				return;
+			}
 
-			} else if (context.contains("/chooseTable") &&
+			if (context.contains("/chooseTable") &&
 					tableDetails.containsKey("boardId") &&
 					tableDetails.containsKey("number") &&
 					messageText.equalsIgnoreCase("/No")) {
 
 				sendMessageWithText(chatId, "Хотите изменить время посадки?" + "\n" + "/Change" + "\n" + "/Stay" + "\n" + "\n" + "/Cancel");
-
 				tableDetails.put("description", "");
+				return;
+			}
 
-			} else if (context.contains("/chooseTable") &&
+			if (context.contains("/chooseTable") &&
 					tableDetails.containsKey("boardId") &&
 					tableDetails.containsKey("number") &&
 					context.contains("/Yes") &&
@@ -119,52 +148,73 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 							messageText.equalsIgnoreCase("/Stay"))) {
 
 				sendMessageWithText(chatId, "Хотите изменить время посадки?" + "\n" + "/Change" + "\n" + "/Stay" + "\n" + "\n" + "/Cancel");
-
 				tableDetails.put("description", messageText);
+				return;
+			}
 
-			} else if (context.contains("/chooseTable") &&
+			if (context.contains("/chooseTable") &&
 					tableDetails.containsKey("boardId") &&
 					tableDetails.containsKey("number") &&
 					messageText.equalsIgnoreCase("/Change")) {
 
 				sendMessageWithText(chatId, "Введите новое время в формате Часы:Минуты");
 				context.add("/Change");
+				return;
+			}
 
-			} else if (context.contains("/chooseTable") &&
+			if (context.contains("/chooseTable") &&
 					tableDetails.containsKey("boardId") &&
 					tableDetails.containsKey("number") &&
 					messageText.equalsIgnoreCase("/Stay")) {
 
 				sessionHandler.sendRequestOnAddTable(tableDetails);
-
 				sendMessageWithText(chatId, "Счёт добавлен в систему");
 				//выходим из меню, но остаётся аунтификация
 				context.clear();
 				tableDetails.clear();
-			} else if (context.contains("/chooseTable") &&
+				printMainMenu(chatId);
+				return;
+			}
+
+			if (context.contains("/chooseTable") &&
 					tableDetails.containsKey("boardId") &&
 					tableDetails.containsKey("number") &&
 					context.contains("/Change")) {
 
-
 				sessionHandler.sendRequestOnAddTable(tableDetails);
-				sessionHandler.sendEditClientTimeStart(parceInputTime(messageText, tableDetails));
-
-				sendMessageWithText(chatId, "Счёт добавлен в систему");
-				//выходим из меню, но остаётся аунтификация
-				context.clear();
-				tableDetails.clear();
+				tableDetails = parceInputTime(messageText, tableDetails);
+				if (tableDetails.containsKey("hours") && tableDetails.containsKey("minutes")) {
+					sessionHandler.sendEditClientTimeStart(tableDetails);
+					sendMessageWithText(chatId, "Счёт добавлен в систему");
+					//выходим из меню, но остаётся аунтификация
+					context.clear();
+					tableDetails.clear();
+					printMainMenu(chatId);
+				} else {
+					sendMessageWithText(chatId, "Вы ввели время в неправильном формате или указали неправильное время попробуйте еще раз изменить время /Change");
+					context.remove("/Change");
+				}
 			}
 		}
 	}
 
 	private Map<String, String> parceInputTime(String hoursMinutes, Map<String, String> tableDetails) {
 
-		String[] parceTime = hoursMinutes.split(":", 2);
-		tableDetails.put("hours", parceTime[0]);
-		tableDetails.put("minutes", parceTime[1]);
+		Pattern pattern = Pattern.compile("\\d{2}:\\d{2}");
+		Matcher matcher = pattern.matcher(hoursMinutes);
+		if (matcher.find()) {
+			String[] parceTime = matcher.group(0).split(":", 2);
+			int hour = Integer.parseInt(parceTime[0]);
+			int minutes = Integer.parseInt(parceTime[1]);
 
-		return tableDetails;
+			if (hour < 24 && minutes < 60) {
+				tableDetails.put("hours", parceTime[0]);
+				tableDetails.put("minutes", parceTime[1]);
+			}
+			return tableDetails;
+		} else {
+			return tableDetails;
+		}
 	}
 
 	private void sendMessageWithText(Long chatId, String text) {
@@ -177,6 +227,15 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 		} catch (TelegramApiException e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void printMainMenu(Long chatId) {
+
+		sendMessageWithText(chatId, "Вы находитесь в главном меню" + "\n"
+				+ "Вам доступны следующие команды: " + "\n"
+				+ "/chooseTable - выберите стол для посадки клиентов" + "\n"
+				+ "\n"
+				+ "/Out - выход из системы");
 	}
 
 	@Override
