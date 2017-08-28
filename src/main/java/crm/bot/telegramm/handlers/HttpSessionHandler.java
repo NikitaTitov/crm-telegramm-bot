@@ -1,8 +1,9 @@
-package crm.bot.telegramm;
+package crm.bot.telegramm.handlers;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.http.Header;
+import crm.bot.telegramm.model.Board;
+import crm.bot.telegramm.model.User;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -28,18 +29,14 @@ public class HttpSessionHandler {
 
 	private Map<String, String> authDetails;
 
-	final static Logger logger = LogManager.getRootLogger();
-
-	public int amountOfBoardsInCafe = 0;
+	private final static Logger logger = LogManager.getRootLogger();
 
 	public HttpSessionHandler() {
-
 	}
 
 	public HttpSessionHandler(Map<String, String> authDetails) {
 
 		this.authDetails = authDetails;
-
 	}
 
 	public void setAuthDetails(Map<String, String> authDetails) {
@@ -47,11 +44,12 @@ public class HttpSessionHandler {
 		this.authDetails = authDetails;
 	}
 
-	public boolean isLoginPasswordCorrect() {
+	public User hasUserWithThisLoginOnServer() {
 
-		boolean flag = true;
+		User user = new User();
 		HttpClient httpclient = HttpClients.createDefault();
-		HttpPost httppost = new HttpPost("http://localhost:8080/processing-url");
+		HttpPost httppost = new HttpPost("http://localhost:8080/authenticationTelegramBotUsers");
+		ObjectMapper objectMapper = new ObjectMapper();
 
 		// Request parameters and other properties.
 		List<NameValuePair> params = new ArrayList<>(2);
@@ -60,19 +58,15 @@ public class HttpSessionHandler {
 		params.add(new BasicNameValuePair("password", authDetails.get("password")));
 		try {
 			httppost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
-			Header header = httpclient.execute(httppost).getFirstHeader("Location");
-			//При удачном обращении нас отправляет на страницу счетов, в этом случае аунтификация считается удачной
-//			if (header.getValue().equalsIgnoreCase("http://localhost:8080/manager/shift/")) {
-//				flag = true;
-//			}
+			HttpResponse response = httpclient.execute(httppost);
+			String json = EntityUtils.toString(response.getEntity(), "UTF-8");
+			user = objectMapper.readValue(json, User.class);
 		} catch (UnsupportedEncodingException e) {
 			logger.error("Problem with encoding: " + e.getLocalizedMessage());
-			flag = false;
 		} catch (IOException e) {
 			logger.error("IOException: " + e.getLocalizedMessage());
-			flag = false;
 		}
-		return flag;
+		return user;
 	}
 
 	private HttpClient connectToServer() {
@@ -107,16 +101,21 @@ public class HttpSessionHandler {
 			HttpResponse response = httpClient.execute(httpGet);
 			String json = EntityUtils.toString(response.getEntity(), "UTF-8");
 			result = objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(ArrayList.class, Board.class));
-			amountOfBoardsInCafe = result.size();
+
 		} catch (ClientProtocolException e) {
 			logger.error("Problem with protocol: " + e.getLocalizedMessage());
 		}
 		return result;
 	}
 
-	public String getStringOfBoards() throws IOException {
+	public List<String> getBoardListName() throws IOException {
 
-		return getListOfBoards().stream().map(Object::toString).collect(Collectors.joining("\n"));
+		return getListOfBoards().stream().map(Board::toString).collect(Collectors.toList());
+	}
+
+	public List<String> getBoardListId() throws IOException {
+
+		return getListOfBoards().stream().map(Board::getId).map(String::valueOf).collect(Collectors.toList());
 	}
 
 	public Board getBoardById(String id) throws IOException {

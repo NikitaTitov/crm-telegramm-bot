@@ -1,4 +1,4 @@
-package crm.bot.telegramm;
+package crm.bot.telegramm.model;
 
 public class Board {
 
