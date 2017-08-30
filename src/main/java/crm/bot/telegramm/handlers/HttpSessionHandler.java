@@ -25,11 +25,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+
 public class HttpSessionHandler {
 
 	private Map<String, String> authDetails;
-
 	private final static Logger logger = LogManager.getRootLogger();
+	URLProperties initProperty = new URLProperties();
 
 	public HttpSessionHandler() {
 	}
@@ -48,7 +49,7 @@ public class HttpSessionHandler {
 
 		User user = new User();
 		HttpClient httpclient = HttpClients.createDefault();
-		HttpPost httppost = new HttpPost("http://localhost:8080/authenticationTelegramBotUsers");
+		HttpPost httppost = new HttpPost(initProperty.checkAuthUrl);
 		ObjectMapper objectMapper = new ObjectMapper();
 
 		// Request parameters and other properties.
@@ -72,9 +73,8 @@ public class HttpSessionHandler {
 	private HttpClient connectToServer() {
 
 		HttpClient httpclient = HttpClients.createDefault();
-		HttpPost httppost = new HttpPost("http://localhost:8080/processing-url");
+		HttpPost httppost = new HttpPost(initProperty.authUrl);
 
-		// Request parameters and other properties.
 		List<NameValuePair> params = new ArrayList<>(2);
 
 		params.add(new BasicNameValuePair("username", authDetails.get("username")));
@@ -93,7 +93,7 @@ public class HttpSessionHandler {
 	public List<Board> getListOfBoards() throws IOException {
 
 		HttpClient httpClient = connectToServer();
-		HttpGet httpGet = new HttpGet("http://localhost:8080/manager/rest/Table");
+		HttpGet httpGet = new HttpGet(initProperty.tableListUrl);
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Board> result = new ArrayList<>();
 
@@ -126,7 +126,7 @@ public class HttpSessionHandler {
 	public void sendRequestOnAddTable(Map<String, String> tableDetails) {
 
 		HttpClient httpClient = connectToServer();
-		HttpPost httpPost = new HttpPost("http://localhost:8080/manager/add-calculate");
+		HttpPost httpPost = new HttpPost(initProperty.addTableUrl);
 
 		List<NameValuePair> params = new ArrayList<>(2);
 
@@ -150,7 +150,7 @@ public class HttpSessionHandler {
 	public void sendEditClientTimeStart(Map<String, String> tableDetails) {
 
 		HttpClient httpClient = connectToServer();
-		HttpPost httpPost = new HttpPost("http://localhost:8080/manager/edit-client-time-start");
+		HttpPost httpPost = new HttpPost(initProperty.changeTimeUrl);
 
 		//Этот метод вызывается после отправки клиентов на сервер и затем меняет время, поэтому getClientLastId возвращает последний ID учитывая новые
 		int nextIdAfterLastClientId = getClientLastId() + 1;
@@ -181,7 +181,7 @@ public class HttpSessionHandler {
 
 		int lastId = 0;
 		HttpClient httpClient = connectToServer();
-		HttpGet httpGet = new HttpGet("http://localhost:8080/manager/rest/clientsNumber");
+		HttpGet httpGet = new HttpGet(initProperty.getClientLastIdUrl);
 
 		try {
 			HttpResponse response = httpClient.execute(httpGet);
