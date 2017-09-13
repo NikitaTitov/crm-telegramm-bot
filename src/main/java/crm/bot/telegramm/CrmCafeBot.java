@@ -242,7 +242,7 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 		} catch (NumberFormatException e) {
 			return false;
 		}
-		return value > 0;
+		return value > 0 && value <= 100;
 	}
 
 	private Map<String, String> parceInputTime(String hoursMinutes, Map<String, String> tableDetails) {
