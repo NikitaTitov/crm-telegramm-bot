@@ -166,7 +166,8 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 					if (!boardList.isEmpty()) {
 						sendMessageWithTextAndInlineKeyboard(chatId, "Выберите стол \n", boardList, sessionHandler.getBoardListId());
 					} else {
-						sendMessageWithTextAndInlineKeyboard(chatId, "В кафе нет созданных столов!\n");
+						sendMessageWithTextAndInlineKeyboard(chatId, "В кафе нет созданных столов!\n", CANCEL_BUTTON);
+						return;
 					}
 				} catch (IOException e) {
 					sendMessageWithText(chatId, "Смена еще не началась");
