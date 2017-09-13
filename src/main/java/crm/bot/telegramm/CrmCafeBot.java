@@ -82,10 +82,13 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 					!tableDetails.containsKey("number") &&
 					!(messageText.equals("/yes") ||
 							messageText.equals("/no"))) {
-
-				sendMessageWithTextAndInlineKeyboard(chatId, "Хотите добавить описание стола? \n", ADD_TABLE_DESCRIPTION_BUTTON, SKIP_TABLE_DESCRIPTION_BUTTON, CANCEL_BUTTON);
-				tableDetails.put("number", messageText);
-				return;
+				if (correctValueOfPeople(messageText)) {
+					sendMessageWithTextAndInlineKeyboard(chatId, "Хотите добавить описание стола? \n", ADD_TABLE_DESCRIPTION_BUTTON, SKIP_TABLE_DESCRIPTION_BUTTON, CANCEL_BUTTON);
+					tableDetails.put("number", messageText);
+					return;
+				} else {
+					sendMessageWithTextAndInlineKeyboard(chatId, "Вы ввели не корректное число попробуйте еще раз");
+				}
 			}
 
 			if (context.contains("/chooseTable") &&
@@ -98,7 +101,6 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 				tableDetails.put("description", messageText);
 				return;
 			}
-
 
 
 			if (context.contains("/chooseTable") &&
@@ -231,6 +233,16 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 				return;
 			}
 		}
+	}
+
+	private boolean correctValueOfPeople(String messageText) {
+		int value;
+		try {
+			value = Integer.valueOf(messageText);
+		} catch (NumberFormatException e) {
+			return false;
+		}
+		return value > 0;
 	}
 
 	private Map<String, String> parceInputTime(String hoursMinutes, Map<String, String> tableDetails) {
