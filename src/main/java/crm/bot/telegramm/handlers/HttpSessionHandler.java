@@ -115,12 +115,25 @@ public class HttpSessionHandler {
 
 	public List<String> getBoardListId() throws IOException {
 
-		return getListOfBoards().stream().map(Board::getId).map(String::valueOf).collect(Collectors.toList());
+		return getListOfBoards().stream().map(Board::getName).map(String::valueOf).collect(Collectors.toList());
 	}
 
-	public Board getBoardById(String id) throws IOException {
+	public Board getBoardByName(String name) throws IOException {
+		for (Board board : getListOfBoards()) {
+			if (board.getName().equals(name)){
+				return board;
+			}
+		}
+		throw new IOException("There is no table with " + name + " name");
+	}
 
-		return getListOfBoards().get(Integer.valueOf(id) - 1);
+	public String getBoardId(String name) throws IOException{
+		for (Board board : getListOfBoards()) {
+			if (board.getName().equals(name)){
+				return board.getId().toString();
+			}
+		}
+		throw new IOException("There is no table with " + name + " name");
 	}
 
 	public void sendRequestOnAddTable(Map<String, String> tableDetails) {

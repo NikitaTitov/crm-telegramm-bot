@@ -69,12 +69,12 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 
 			if (context.contains("/chooseTable") && !tableDetails.containsKey("boardId")) {
 				try {
-					sendMessageWithTextAndInlineKeyboard(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardById(messageText) + "\n", CANCEL_BUTTON);
+					sendMessageWithTextAndInlineKeyboard(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardByName(messageText) + "\n", CANCEL_BUTTON);
+					tableDetails.put("boardId", sessionHandler.getBoardId(messageText));
 				} catch (IOException e) {
 					sendMessageWithText(chatId, "Смена еще не началась");
 					return;
 				}
-				tableDetails.put("boardId", messageText);
 				return;
 			}
 
@@ -181,12 +181,12 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 
 			if (context.contains("/chooseTable") && !tableDetails.containsKey("boardId")) {
 				try {
-					sendMessageWithTextAndInlineKeyboard(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardById(callData) + "\n", CANCEL_BUTTON);
+					sendMessageWithTextAndInlineKeyboard(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardByName(callData) + "\n", CANCEL_BUTTON);
+					tableDetails.put("boardId", sessionHandler.getBoardId(callData));
 				} catch (IOException e) {
 					sendMessageWithText(chatId, "Смена еще не началась");
 					return;
 				}
-				tableDetails.put("boardId", callData);
 				return;
 			}
 
