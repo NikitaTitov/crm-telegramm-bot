@@ -1,6 +1,6 @@
 package crm.bot.telegramm.model;
 
-public class Board extends BaseEntity {
+public class Board {
 
 	private Long id;
 
