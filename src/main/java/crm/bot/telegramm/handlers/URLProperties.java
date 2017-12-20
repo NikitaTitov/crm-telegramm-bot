@@ -1,7 +1,8 @@
 package crm.bot.telegramm.handlers;
 
 
-import java.io.FileInputStream;
+import crm.bot.telegramm.Main;
+;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
@@ -25,15 +26,16 @@ public class URLProperties {
 
 		Properties prop = new Properties();
 		Map<String, String> property = new HashMap<>();
-		try (InputStream input = new FileInputStream("src/main/resources/config.properties")) {
+		String prefix = Main.prefix;
+		try (InputStream input = ClassLoader.getSystemResourceAsStream("config.properties")) {
 			prop.load(input);
 
-			checkAuthUrl = prop.getProperty("checkAuth");
-			authUrl = prop.getProperty("auth");
-			tableListUrl = prop.getProperty("tableList");
-			addTableUrl = prop.getProperty("addTable");
-			changeTimeUrl = prop.getProperty("changeTime");
-			getClientLastIdUrl = prop.getProperty("lastClientId");
+			checkAuthUrl = prefix + prop.getProperty("checkAuth");
+			authUrl = prefix + prop.getProperty("auth");
+			tableListUrl = prefix + prop.getProperty("tableList");
+			addTableUrl = prefix + prop.getProperty("addTable");
+			changeTimeUrl = prefix + prop.getProperty("changeTime");
+			getClientLastIdUrl = prefix + prop.getProperty("lastClientId");
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}

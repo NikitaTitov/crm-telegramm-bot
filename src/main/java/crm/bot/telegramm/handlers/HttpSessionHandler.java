@@ -23,6 +23,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 
@@ -93,13 +94,19 @@ public class HttpSessionHandler {
 	public List<Board> getListOfBoards() throws IOException {
 
 		HttpClient httpClient = connectToServer();
-		HttpGet httpGet = new HttpGet(initProperty.tableListUrl);
+		HttpPost httpPost = new HttpPost(initProperty.tableListUrl);
 		ObjectMapper objectMapper = new ObjectMapper();
 		List<Board> result = new ArrayList<>();
 
+		List<NameValuePair> params = new ArrayList<>(1);
+		params.add(new BasicNameValuePair("username", authDetails.get("username")));
 		try {
-			HttpResponse response = httpClient.execute(httpGet);
+			httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+			HttpResponse response = httpClient.execute(httpPost);
 			String json = EntityUtils.toString(response.getEntity(), "UTF-8");
+			if (Objects.equals(json, "null")) {
+				throw new IOException();
+			}
 			result = objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(ArrayList.class, Board.class));
 
 		} catch (ClientProtocolException e) {

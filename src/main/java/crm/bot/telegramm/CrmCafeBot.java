@@ -351,6 +351,6 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 	@Override
 	public String getBotToken() {
 
-		return "372169972:AAHGBe36HPmH3vRo07UmwTvjU0Ho0wTOS8s";
+		return "430590498:AAGCvzRsWL660e5NSgAeEDDxcQj8QH4Abb0";
 	}
 }
