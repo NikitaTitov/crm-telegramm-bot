@@ -17,6 +17,9 @@ public class URLProperties {
 	public String addTableUrl;
 	public String changeTimeUrl;
 	public String getClientLastIdUrl;
+	public String calculateList;
+	public String categoryList;
+	public String addProductToTable;
 
 	public URLProperties() {
 		initProperty();
@@ -36,6 +39,9 @@ public class URLProperties {
 			addTableUrl = prefix + prop.getProperty("addTable");
 			changeTimeUrl = prefix + prop.getProperty("changeTime");
 			getClientLastIdUrl = prefix + prop.getProperty("lastClientId");
+			calculateList = prefix + prop.getProperty("calculateList");
+			categoryList = prefix + prop.getProperty("categoryList");
+			addProductToTable = prefix + prop.getProperty("addProductToTable");
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}

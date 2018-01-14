@@ -2,8 +2,7 @@ package crm.bot.telegramm.handlers;
 
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import crm.bot.telegramm.model.Board;
-import crm.bot.telegramm.model.User;
+import crm.bot.telegramm.model.*;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -20,197 +19,226 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
 public class HttpSessionHandler {
 
-	private Map<String, String> authDetails;
-	private final static Logger logger = LogManager.getRootLogger();
-	URLProperties initProperty = new URLProperties();
+    private Map<String, String> authDetails;
+    private final static Logger logger = LogManager.getRootLogger();
+    private static Set<Calculate> calculates = new HashSet<>();
+    private static List<Category> categories = new ArrayList<>();
+    private URLProperties initProperty = new URLProperties();
 
-	public HttpSessionHandler() {
-	}
+    public HttpSessionHandler() {
+    }
 
-	public HttpSessionHandler(Map<String, String> authDetails) {
+    public void setAuthDetails(Map<String, String> authDetails) {
+        this.authDetails = authDetails;
+    }
 
-		this.authDetails = authDetails;
-	}
+    public User hasUserWithThisLoginOnServer() {
+        User user = new User();
+        HttpClient httpclient = HttpClients.createDefault();
+        HttpPost httppost = new HttpPost(initProperty.checkAuthUrl);
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<NameValuePair> params = new ArrayList<>(2);
 
-	public void setAuthDetails(Map<String, String> authDetails) {
+        params.add(new BasicNameValuePair("username", authDetails.get("username")));
+        params.add(new BasicNameValuePair("password", authDetails.get("password")));
 
-		this.authDetails = authDetails;
-	}
+        try {
+            httppost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+            HttpResponse response = httpclient.execute(httppost);
+            String json = EntityUtils.toString(response.getEntity(), "UTF-8");
+            user = objectMapper.readValue(json, User.class);
+        } catch (UnsupportedEncodingException e) {
+            logger.error("Problem with encoding: " + e.getLocalizedMessage());
+        } catch (IOException e) {
+            logger.error("IOException: " + e.getLocalizedMessage());
+        }
+        return user;
+    }
 
-	public User hasUserWithThisLoginOnServer() {
+    public List<Board> getListOfBoards() throws IOException {
+        HttpClient httpClient = connectToServer();
+        HttpPost httpPost = new HttpPost(initProperty.tableListUrl);
+        ObjectMapper objectMapper = new ObjectMapper();
+        List<Board> result = new ArrayList<>();
+        List<NameValuePair> params = new ArrayList<>(1);
 
-		User user = new User();
-		HttpClient httpclient = HttpClients.createDefault();
-		HttpPost httppost = new HttpPost(initProperty.checkAuthUrl);
-		ObjectMapper objectMapper = new ObjectMapper();
+        params.add(new BasicNameValuePair("username", authDetails.get("username")));
 
-		// Request parameters and other properties.
-		List<NameValuePair> params = new ArrayList<>(2);
+        try {
+            httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+            HttpResponse response = httpClient.execute(httpPost);
+            String json = EntityUtils.toString(response.getEntity(), "UTF-8");
+            if (Objects.equals(json, "null")) {
+                throw new IOException();
+            }
+            result = objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(ArrayList.class, Board.class));
 
-		params.add(new BasicNameValuePair("username", authDetails.get("username")));
-		params.add(new BasicNameValuePair("password", authDetails.get("password")));
-		try {
-			httppost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
-			HttpResponse response = httpclient.execute(httppost);
-			String json = EntityUtils.toString(response.getEntity(), "UTF-8");
-			user = objectMapper.readValue(json, User.class);
-		} catch (UnsupportedEncodingException e) {
-			logger.error("Problem with encoding: " + e.getLocalizedMessage());
-		} catch (IOException e) {
-			logger.error("IOException: " + e.getLocalizedMessage());
-		}
-		return user;
-	}
+        } catch (ClientProtocolException e) {
+            logger.error("Problem with protocol: " + e.getLocalizedMessage());
+        }
+        return result;
+    }
 
-	private HttpClient connectToServer() {
+    @SuppressWarnings("unchecked")
+    public Set<Calculate> getCalculateList() {
+        calculates = (HashSet) sendGetRequest(calculates, new HttpGet(initProperty.calculateList), Calculate.class);
+        calculates = calculates.stream().filter(calculate -> !(calculate.getDescription().isEmpty() ||  calculate.getDescription() == null)).filter(Calculate::isState).collect(Collectors.toSet());
+        return calculates;
+    }
 
-		HttpClient httpclient = HttpClients.createDefault();
-		HttpPost httppost = new HttpPost(initProperty.authUrl);
+    @SuppressWarnings("unchecked")
+    public List<Category> getCategoryList() {
+        categories = (ArrayList) sendGetRequest(categories, new HttpGet(initProperty.categoryList), Category.class);
+        return categories;
+    }
 
-		List<NameValuePair> params = new ArrayList<>(2);
+    public List<String> getBoardListName() throws IOException {
+        return getListOfBoards().stream().map(Board::toString).collect(Collectors.toList());
+    }
 
-		params.add(new BasicNameValuePair("username", authDetails.get("username")));
-		params.add(new BasicNameValuePair("password", authDetails.get("password")));
-		try {
-			httppost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
-			httpclient.execute(httppost);
-		} catch (UnsupportedEncodingException e) {
-			logger.error("Problem with encoding: " + e.getLocalizedMessage());
-		} catch (IOException e) {
-			logger.error("IOException: " + e.getLocalizedMessage());
-		}
-		return httpclient;
-	}
+    public List<String> getBoardListId() throws IOException {
+        return getListOfBoards().stream().map(Board::getName).collect(Collectors.toList());
+    }
 
-	public List<Board> getListOfBoards() throws IOException {
+    public Board getBoardByName(String name) throws IOException {
+        for (Board board : getListOfBoards()) {
+            if (board.getName().equals(name)) {
+                return board;
+            }
+        }
+        throw new IOException("There is no table with " + name + " name");
+    }
 
-		HttpClient httpClient = connectToServer();
-		HttpPost httpPost = new HttpPost(initProperty.tableListUrl);
-		ObjectMapper objectMapper = new ObjectMapper();
-		List<Board> result = new ArrayList<>();
+    public String getBoardId(String name) throws IOException {
+        for (Board board : getListOfBoards()) {
+            if (board.getName().equals(name)) {
+                return board.getId().toString();
+            }
+        }
+        throw new IOException("There is no table with " + name + " name");
+    }
 
-		List<NameValuePair> params = new ArrayList<>(1);
-		params.add(new BasicNameValuePair("username", authDetails.get("username")));
-		try {
-			httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
-			HttpResponse response = httpClient.execute(httpPost);
-			String json = EntityUtils.toString(response.getEntity(), "UTF-8");
-			if (Objects.equals(json, "null")) {
-				throw new IOException();
-			}
-			result = objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(ArrayList.class, Board.class));
+    public void sendRequestOnAddTable(Map<String, String> tableDetails) {
+        List<NameValuePair> params = new ArrayList<>(2);
 
-		} catch (ClientProtocolException e) {
-			logger.error("Problem with protocol: " + e.getLocalizedMessage());
-		}
-		return result;
-	}
+        params.add(new BasicNameValuePair("boardId", tableDetails.get("boardId")));
+        params.add(new BasicNameValuePair("number", tableDetails.get("number")));
+        params.add(new BasicNameValuePair("description", tableDetails.get("description")));
 
-	public List<String> getBoardListName() throws IOException {
+        sendPostRequest(params, new HttpPost(initProperty.addTableUrl));
+    }
 
-		return getListOfBoards().stream().map(Board::toString).collect(Collectors.toList());
-	}
+    public void sendRequestOnAddProductToClient (Map<String, String> tableDetails) {
+        List<NameValuePair> params = new ArrayList<>(2);
+        if (tableDetails.get("clientsId").length() > 1) {
+            String[] ids = tableDetails.get("clientsId").replaceAll("]|\\[", "").split(",");
+            for (String id : ids) {
+                params.add(new BasicNameValuePair("clientsId", String.valueOf(id)));
+            }
+        } else {
+            params.add(new BasicNameValuePair("clientsId", tableDetails.get("clientsId")));
+        }
+        params.add(new BasicNameValuePair("calculateId", tableDetails.get("calculateId")));
+        params.add(new BasicNameValuePair("productId", tableDetails.get("productId")));
 
-	public List<String> getBoardListId() throws IOException {
+        sendPostRequest(params, new HttpPost(initProperty.addProductToTable));
+    }
 
-		return getListOfBoards().stream().map(Board::getName).map(String::valueOf).collect(Collectors.toList());
-	}
+    private void sendPostRequest(List<NameValuePair> params, HttpPost httpPost) {
+        try {
+            httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+            HttpResponse response = connectToServer().execute(httpPost);
+            HttpEntity entity = response.getEntity();
+            System.out.println(response.getStatusLine().getReasonPhrase() + " " + response.getStatusLine().getStatusCode());
+            EntityUtils.consume(entity);
+        } catch (IOException e) {
+            logger.error("IOException: " + e.getLocalizedMessage());
+        }
+    }
 
-	public Board getBoardByName(String name) throws IOException {
-		for (Board board : getListOfBoards()) {
-			if (board.getName().equals(name)){
-				return board;
-			}
-		}
-		throw new IOException("There is no table with " + name + " name");
-	}
+    public void sendEditClientTimeStart(Map<String, String> tableDetails) {
+        HttpClient httpClient = connectToServer();
+        HttpPost httpPost = new HttpPost(initProperty.changeTimeUrl);
 
-	public String getBoardId(String name) throws IOException{
-		for (Board board : getListOfBoards()) {
-			if (board.getName().equals(name)){
-				return board.getId().toString();
-			}
-		}
-		throw new IOException("There is no table with " + name + " name");
-	}
+        //Этот метод вызывается после отправки клиентов на сервер и затем меняет время, поэтому getClientLastId возвращает последний ID учитывая новые
+        int nextIdAfterLastClientId = getClientLastId() + 1;
+        int amountOfNewClients = Integer.parseInt(tableDetails.get("number"));
+        int nextPositionAfterOldClientId = nextIdAfterLastClientId - amountOfNewClients;//
 
-	public void sendRequestOnAddTable(Map<String, String> tableDetails) {
+        for (int i = nextPositionAfterOldClientId; i < nextIdAfterLastClientId; ++i) {
+            List<NameValuePair> params = new ArrayList<>(2);
+            String clientId = String.valueOf(i);
 
-		HttpClient httpClient = connectToServer();
-		HttpPost httpPost = new HttpPost(initProperty.addTableUrl);
+            params.add(new BasicNameValuePair("clientId", clientId));
+            params.add(new BasicNameValuePair("hours", tableDetails.get("hours")));
+            params.add(new BasicNameValuePair("minutes", tableDetails.get("minutes")));
 
-		List<NameValuePair> params = new ArrayList<>(2);
+            try {
+                httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+                EntityUtils.consume(httpClient.execute(httpPost).getEntity());//release connection
+            } catch (ClientProtocolException e) {
+                logger.error("Problem with protocol: " + e.getLocalizedMessage());
+            } catch (IOException e) {
+                logger.error("IOException: " + e.getLocalizedMessage());
+            }
+        }
+    }
 
-		params.add(new BasicNameValuePair("boardId", tableDetails.get("boardId")));
-		params.add(new BasicNameValuePair("number", tableDetails.get("number")));
-		params.add(new BasicNameValuePair("description", tableDetails.get("description")));
+    private int getClientLastId() {
+        int lastId = 0;
+        HttpClient httpClient = connectToServer();
+        HttpGet httpGet = new HttpGet(initProperty.getClientLastIdUrl);
 
-		try {
-			httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
-			HttpResponse response = httpClient.execute(httpPost);
-			HttpEntity entity = response.getEntity();
+        try {
+            HttpResponse response = httpClient.execute(httpGet);
+            lastId = Integer.parseInt(EntityUtils.toString(response.getEntity(), "UTF-8"));
+        } catch (ClientProtocolException e) {
+            logger.error("Problem with protocol: " + e.getLocalizedMessage());
+        } catch (IOException e) {
+            logger.error("IOException: " + e.getLocalizedMessage());
+        }
+        return lastId;
+    }
 
-			EntityUtils.consume(entity);
-		} catch (IOException e) {
-			logger.error("IOException: " + e.getLocalizedMessage());
-		}
+    private <T> Collection<T> sendGetRequest(Collection<T> collection, HttpGet httpGet, Class<T> typeParameterClass) {
+        ObjectMapper objectMapper = new ObjectMapper();
 
+        try {
+            HttpResponse response = connectToServer().execute(httpGet);
+            String json = EntityUtils.toString(response.getEntity(), "UTF-8");
+            if (Objects.equals(json, "null")) {
+                throw new IOException();
+            }
+            collection = objectMapper.readValue(json, objectMapper.getTypeFactory().constructCollectionType(collection.getClass(), typeParameterClass));
+        } catch (ClientProtocolException e) {
+            logger.error("Problem with protocol: " + e.getLocalizedMessage());
+        } catch (IOException e) {
+            logger.error("IOException: " + e.getLocalizedMessage());
+        }
+        return collection;
+    }
 
-	}
+    private HttpClient connectToServer() {
+        HttpClient httpclient = HttpClients.createDefault();
+        HttpPost httppost = new HttpPost(initProperty.authUrl);
+        List<NameValuePair> params = new ArrayList<>(2);
 
-	public void sendEditClientTimeStart(Map<String, String> tableDetails) {
-
-		HttpClient httpClient = connectToServer();
-		HttpPost httpPost = new HttpPost(initProperty.changeTimeUrl);
-
-		//Этот метод вызывается после отправки клиентов на сервер и затем меняет время, поэтому getClientLastId возвращает последний ID учитывая новые
-		int nextIdAfterLastClientId = getClientLastId() + 1;
-		int amountOfNewClients = Integer.parseInt(tableDetails.get("number"));
-		int nextPositionAfterOldClientId = nextIdAfterLastClientId - amountOfNewClients;//
-
-		for (int i = nextPositionAfterOldClientId; i < nextIdAfterLastClientId; ++i) {
-			List<NameValuePair> params = new ArrayList<>(2);
-			String clientId = String.valueOf(i);
-
-			params.add(new BasicNameValuePair("clientId", clientId));
-			params.add(new BasicNameValuePair("hours", tableDetails.get("hours")));
-			params.add(new BasicNameValuePair("minutes", tableDetails.get("minutes")));
-
-			try {
-				httpPost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
-				EntityUtils.consume(httpClient.execute(httpPost).getEntity());//release connection
-			} catch (ClientProtocolException e) {
-				logger.error("Problem with protocol: " + e.getLocalizedMessage());
-			} catch (IOException e) {
-				logger.error("IOException: " + e.getLocalizedMessage());
-			}
-		}
-
-	}
-
-	private int getClientLastId() {
-
-		int lastId = 0;
-		HttpClient httpClient = connectToServer();
-		HttpGet httpGet = new HttpGet(initProperty.getClientLastIdUrl);
-
-		try {
-			HttpResponse response = httpClient.execute(httpGet);
-			lastId = Integer.parseInt(EntityUtils.toString(response.getEntity(), "UTF-8"));
-		} catch (ClientProtocolException e) {
-			logger.error("Problem with protocol: " + e.getLocalizedMessage());
-		} catch (IOException e) {
-			logger.error("IOException: " + e.getLocalizedMessage());
-		}
-		return lastId;
-	}
+        params.add(new BasicNameValuePair("username", authDetails.get("username")));
+        params.add(new BasicNameValuePair("password", authDetails.get("password")));
+        try {
+            httppost.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
+            httpclient.execute(httppost);
+        } catch (UnsupportedEncodingException e) {
+            logger.error("Problem with encoding: " + e.getLocalizedMessage());
+        } catch (IOException e) {
+            logger.error("IOException: " + e.getLocalizedMessage());
+        }
+        return httpclient;
+    }
 }

@@ -2,7 +2,8 @@ package crm.bot.telegramm;
 
 
 import crm.bot.telegramm.handlers.HttpSessionHandler;
-import crm.bot.telegramm.model.User;
+import crm.bot.telegramm.model.*;
+
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.telegram.telegrambots.api.methods.send.SendMessage;
@@ -13,344 +14,400 @@ import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.exceptions.TelegramApiException;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static crm.bot.telegramm.handlers.ButtonsHandler.*;
 import static crm.bot.telegramm.handlers.UserHandler.isEmptyUser;
+import static crm.bot.telegramm.utils.NameAndIDGetters.*;
 
 public class CrmCafeBot extends TelegramLongPollingBot {
 
-	private List<String> context = new ArrayList<>();
-	private Map<String, String> authDetails = new HashMap<>();
-	private Map<String, String> tableDetails = new HashMap<>();
-	private HttpSessionHandler sessionHandler = new HttpSessionHandler();
-	private final static Logger logger = LogManager.getRootLogger();
+    private List<String> context = new ArrayList<>();
+    private Map<String, String> authDetails = new HashMap<>();
+    private Map<String, String> tableDetails = new HashMap<>();
 
-	//в этом методе порядок строк влияет на работоспособность приложения.
-	@Override
-	public void onUpdateReceived(Update update) {
+    private HttpSessionHandler sessionHandler = new HttpSessionHandler();
+    private final static Logger logger = LogManager.getRootLogger();
 
-		if (update.hasMessage() && update.getMessage().hasText()) {
+    //в этом методе порядок строк влияет на работоспособность приложения.
+    @Override
+    public void onUpdateReceived(Update update) {
 
-			String messageText = update.getMessage().getText();
-			long chatId = update.getMessage().getChatId();
+        if (update.hasMessage() && update.getMessage().hasText()) {
 
-			if (messageText.equalsIgnoreCase("/start")) {
-				printHelloOnStart(chatId);
-				return;
-			}
+            String messageText = update.getMessage().getText();
+            long chatId = update.getMessage().getChatId();
 
-			if (context.contains("/auth") && !authDetails.containsKey("username")) {
-				sendMessageWithText(chatId, "Введите пароль");
-				authDetails.put("username", messageText);
-				return;
-			}
+            if (messageText.equalsIgnoreCase("/start")) {
+                printHelloOnStart(chatId);
+                return;
+            }
 
-			if (context.contains("/auth") && authDetails.containsKey("username")) {
-				authDetails.put("password", messageText);
-				sessionHandler.setAuthDetails(authDetails);
-				User cafeUser = sessionHandler.hasUserWithThisLoginOnServer();
-				if (isEmptyUser(cafeUser)) {
-					sendMessageWithText(chatId, cafeUser.getFirstName() + ", здравствуйте!");
-					printMainMenu(chatId);
-					context.clear();
-				} else {
-					sendMessageWithTextAndInlineKeyboard(chatId, "Вы ввели неправильный логин/пароль попробуйте войти заново \n", AUTH_BUTTON);
-					authDetails.clear();
-					context.clear();
-				}
-				return;
-			}
+            if (context.contains("/auth") && !authDetails.containsKey("username")) {
+                sendMessageWithText(chatId, "Введите пароль");
+                authDetails.put("username", messageText);
+                return;
+            }
 
-			if (context.contains("/chooseTable") && !tableDetails.containsKey("boardId")) {
-				try {
-					sendMessageWithTextAndInlineKeyboard(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardByName(messageText) + "\n", CANCEL_BUTTON);
-					tableDetails.put("boardId", sessionHandler.getBoardId(messageText));
-				} catch (IOException e) {
-					sendMessageWithText(chatId, "Смена еще не началась");
-					return;
-				}
-				return;
-			}
+            if (context.contains("/auth") && authDetails.containsKey("username")) {
+                authDetails.put("password", messageText);
+                sessionHandler.setAuthDetails(authDetails);
+                User cafeUser = sessionHandler.hasUserWithThisLoginOnServer();
+                if (isEmptyUser(cafeUser)) {
+                    sendMessageWithText(chatId, cafeUser.getFirstName() + ", здравствуйте!");
+                    printMainMenu(chatId);
+                    context.clear();
+                } else {
+                    sendMessageWithTextAndInlineKeyboard(chatId, "Вы ввели неправильный логин/пароль попробуйте войти заново \n", AUTH_BUTTON);
+                    authDetails.clear();
+                    context.clear();
+                }
+                return;
+            }
 
-			if (tableDetails.containsKey("boardId") &&
-					!tableDetails.containsKey("number") &&
-					!(messageText.equals("/yes") ||
-							messageText.equals("/no"))) {
-				if (correctValueOfPeople(messageText)) {
-					sendMessageWithTextAndInlineKeyboard(chatId, "Хотите добавить описание стола? \n", ADD_TABLE_DESCRIPTION_BUTTON, SKIP_TABLE_DESCRIPTION_BUTTON, CANCEL_BUTTON);
-					tableDetails.put("number", messageText);
-					return;
-				} else {
-					sendMessageWithTextAndInlineKeyboard(chatId, "Вы ввели не корректное число попробуйте еще раз");
-				}
-			}
+            if (tableDetails.containsKey("boardId") &&
+                    !tableDetails.containsKey("number")) {
+                if (correctValueOfPeople(messageText)) {
+                    sendMessageWithTextAndInlineKeyboard(chatId, "Добавьте описание стола \n", CANCEL_BUTTON);
+                    tableDetails.put("number", messageText);
+                } else {
+                    sendMessageWithTextAndInlineKeyboard(chatId, "Вы ввели не корректное число попробуйте еще раз");
+                }
+                return;
+            }
 
-			if (context.contains("/chooseTable") &&
-					tableDetails.containsKey("boardId") &&
-					tableDetails.containsKey("number") &&
-					context.contains("/yes") &&
-					!context.contains("/change")) {
+            if (context.contains("/chooseTable") &&
+                    tableDetails.containsKey("boardId") &&
+                    tableDetails.containsKey("number") &&
+                    !context.contains("/change")) {
 
-				sendMessageWithTextAndInlineKeyboard(chatId, "Хотите изменить время посадки? \n", CHANGE_SEAT_TIME_BUTTON, LEAVE_SEAT_TIME_BUTTON, CANCEL_BUTTON);
-				tableDetails.put("description", messageText);
-				return;
-			}
+                sendMessageWithTextAndInlineKeyboard(chatId, "Хотите изменить время посадки? \n", CHANGE_SEAT_TIME_BUTTON, LEAVE_SEAT_TIME_BUTTON, CANCEL_BUTTON);
+                tableDetails.put("description", messageText);
+                return;
+            }
 
 
-			if (context.contains("/chooseTable") &&
-					tableDetails.containsKey("boardId") &&
-					tableDetails.containsKey("number") &&
-					context.contains("/change")) {
+            if (context.contains("/chooseTable") &&
+                    tableDetails.containsKey("boardId") &&
+                    tableDetails.containsKey("number") &&
+                    context.contains("/change")) {
 
-				tableDetails = parceInputTime(messageText, tableDetails);
-				if (tableDetails.containsKey("hours") && tableDetails.containsKey("minutes")) {
-					sessionHandler.sendRequestOnAddTable(tableDetails);
-					sessionHandler.sendEditClientTimeStart(tableDetails);
-					sendMessageWithText(chatId, "Счёт добавлен в систему");
-					//выходим из меню, но остаётся аунтификация
-					context.clear();
-					tableDetails.clear();
-					printMainMenu(chatId);
-				} else {
-					sendMessageWithTextAndInlineKeyboard(chatId, "Вы ввели время в неправильном формате или указали неправильное время попробуйте еще раз изменить время \n", CHANGE_SEAT_TIME_BUTTON);
-					context.remove("/change");
-				}
-			}
-		} else if (update.hasCallbackQuery()) {
+                tableDetails = parceInputTime(messageText, tableDetails);
+                if (tableDetails.containsKey("hours") && tableDetails.containsKey("minutes")) {
+                    sessionHandler.sendRequestOnAddTable(tableDetails);
+                    sessionHandler.sendEditClientTimeStart(tableDetails);
+                    sendMessageWithText(chatId, "Счёт добавлен в систему");
+                    //выходим из меню, но остаётся аунтификация
+                    context.clear();
+                    tableDetails.clear();
+                    printMainMenu(chatId);
+                } else {
+                    sendMessageWithTextAndInlineKeyboard(chatId, "Вы ввели время в неправильном формате или указали неправильное время попробуйте еще раз изменить время \n", CHANGE_SEAT_TIME_BUTTON);
+                    context.remove("/change");
+                }
+            }
+        } else if (update.hasCallbackQuery()) {
 
-			String callData = update.getCallbackQuery().getData();
-			long chatId = update.getCallbackQuery().getMessage().getChatId();
+            String callData = update.getCallbackQuery().getData();
+            long chatId = update.getCallbackQuery().getMessage().getChatId();
 
-			if (callData.equals("/auth")) {
-				sendMessageWithText(chatId, "Введите логин");
-				context.add(callData);
-				return;
-			}
-			if (callData.equals("/out")) {
-				context.clear();
-				authDetails.clear();
-				tableDetails.clear();
-				printOut(chatId);
-				return;
-			}
-			if (callData.equals("/cancel")) {
-				context.clear();
-				tableDetails.clear();
-				printMainMenu(chatId);
-				return;
-			}
-			if (callData.equals("/auth") && authDetails.containsKey("username") && authDetails.containsKey("password")) {
-				sendMessageWithTextAndInlineKeyboard(chatId, "Вы уже авторизованы, выйдите из системы чтобы зайти под другим пользователем \n", OUT_BUTTON);
-				return;
-			}
-			//если у нас нет записи о том что мы заходили в меню аунтификации
-			if (!(context.contains("/auth")) && callData.equals("/auth")) {
-				sendMessageWithText(chatId, "Введите логин");
-				context.add(callData);
-				return;
-			}
+            if (callData.equals("/auth")) {
+                sendMessageWithText(chatId, "Введите логин");
+                context.add(callData);
+                return;
+            }
+            if (callData.equals("/out")) {
+                context.clear();
+                authDetails.clear();
+                tableDetails.clear();
+                printOut(chatId);
+                return;
+            }
+            if (callData.equals("/cancel")) {
+                context.clear();
+                tableDetails.clear();
+                printMainMenu(chatId);
+                return;
+            }
+            if (callData.equals("/auth") && authDetails.containsKey("username") && authDetails.containsKey("password")) {
+                sendMessageWithTextAndInlineKeyboard(chatId, "Вы уже авторизованы, выйдите из системы чтобы зайти под другим пользователем \n", OUT_BUTTON);
+                return;
+            }
+            //если у нас нет записи о том что мы заходили в меню аунтификации
+            if (!(context.contains("/auth")) && callData.equals("/auth")) {
+                sendMessageWithText(chatId, "Введите логин");
+                context.add(callData);
+                return;
+            }
 
-			//если у нас есть пароль, логин и нас просят добавить стол, а так же мы еще не заходили в это меню
-			if (authDetails.containsKey("username") &&
-					authDetails.containsKey("password") &&
-					callData.equals("/chooseTable") &&
-					!context.contains("/chooseTable")) {
+            //если у нас есть пароль, логин и нас просят добавить стол, а так же мы еще не заходили в это меню
+            if (authDetails.containsKey("username") &&
+                    authDetails.containsKey("password") &&
+                    callData.equals("/chooseTable") &&
+                    !context.contains("/chooseTable")) {
+                try {
+                    List<String> boardList = sessionHandler.getBoardListName();
+                    if (!boardList.isEmpty()) {
+                        sendMessageWithTextAndInlineKeyboard(chatId, "Выберите стол \n", boardList, sessionHandler.getBoardListId());
+                    } else {
+                        sendMessageWithTextAndInlineKeyboard(chatId, "В кафе нет созданных столов!\n", CANCEL_BUTTON);
+                        return;
+                    }
+                } catch (IOException e) {
+                    sendMessageWithText(chatId, "Смена еще не началась");
+                    return;
+                }
+                context.add(callData);
+                return;
+            }
 
+            if (callData.contains("/menu")) {
+                    Set<Calculate> calculates = sessionHandler.getCalculateList();
+                    if (!calculates.isEmpty()) {
+                        sendMessageWithTextAndInlineKeyboard(chatId, "Выберите счёт \n", getListCalculateNames(calculates), getCalculateListId(calculates));
+                    } else {
+                        sendMessageWithTextAndInlineKeyboard(chatId, "В кафе нет созданных счетов!\n", CANCEL_BUTTON);
+                    }
+                context.add(callData);
+                return;
+            }
 
-				try {
-					List boardList = sessionHandler.getBoardListName();
-					if (!boardList.isEmpty()) {
-						sendMessageWithTextAndInlineKeyboard(chatId, "Выберите стол \n", boardList, sessionHandler.getBoardListId());
-					} else {
-						sendMessageWithTextAndInlineKeyboard(chatId, "В кафе нет созданных столов!\n", CANCEL_BUTTON);
-						return;
-					}
-				} catch (IOException e) {
-					sendMessageWithText(chatId, "Смена еще не началась");
-					return;
-				}
-				context.add(callData);
-				return;
-			}
+            if (context.contains("/menu") && !tableDetails.containsKey("calculateId")) {
+                try {
+                    Set<Calculate> calculates = sessionHandler.getCalculateList();
+                    List<Client> clientsWithNotEmptyDescription = getClientsFromCalculateWithNotEmptyDescription(callData, calculates);
+                    List<Client> allClietns = getClientsFromCalculate(callData, calculates);
 
-			if (context.contains("/chooseTable") && !tableDetails.containsKey("boardId")) {
-				try {
-					sendMessageWithTextAndInlineKeyboard(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardByName(callData) + "\n", CANCEL_BUTTON);
-					tableDetails.put("boardId", sessionHandler.getBoardId(callData));
-				} catch (IOException e) {
-					sendMessageWithText(chatId, "Смена еще не началась");
-					return;
-				}
-				return;
-			}
+                    if (!clientsWithNotEmptyDescription.isEmpty()) {
+                        sendMessageWithTextAndInlineKeyboard(chatId, "Ок, какому клиенту хотите добавить заказ?\n", getListClientsNames(clientsWithNotEmptyDescription), getListClientsId(clientsWithNotEmptyDescription));
+                        sendMessageWithTextAndInlineKeyboard(chatId, "Или добавить всем?\n", TO_ALL_CLIENTS_BUTTON.setCallbackData(getListClientsId(allClietns).toString()));
+                    } else {
+                        tableDetails.put("calculateId", callData);
+                        tableDetails.put("clientsId", getListClientsId(allClietns).toString());
+                        List<Category> categories = sessionHandler.getCategoryList();
+                        if (!categories.isEmpty()) {
+                            sendMessageWithTextAndInlineKeyboard(chatId, "Выберите категорию продуктов \n", getListCategoryNames(categories), getListCategoryId(categories));
+                        } else {
+                            sendMessageWithTextAndInlineKeyboard(chatId, "В кафе нет созданных категорий!\n", CANCEL_BUTTON);
+                        }
+                        return;
+                    }
 
-			if (tableDetails.containsKey("boardId") &&
-					tableDetails.containsKey("number") &&
-					callData.equals("/yes")) {
+                    tableDetails.put("calculateId", callData);
+                } catch (IOException e) {
+                    sendMessageWithText(chatId, "Смена еще не началась");
+                }
+                return;
+            }
 
-				sendMessageWithTextAndInlineKeyboard(chatId, "Введите описание стола", CANCEL_BUTTON);
-				context.add("/yes");
-				return;
-			}
+            if (context.contains("/menu") && tableDetails.containsKey("calculateId") && !tableDetails.containsKey("clientsId")) {
+                    List<Category> categories = sessionHandler.getCategoryList();
+                    if (!categories.isEmpty()) {
+                        sendMessageWithTextAndInlineKeyboard(chatId, "Выберите категорию продуктов \n", getListCategoryNames(categories), getListCategoryId(categories));
+                        tableDetails.put("clientsId", callData);
+                    } else {
+                        sendMessageWithTextAndInlineKeyboard(chatId, "В кафе нет созданных категорий!\n", CANCEL_BUTTON);
+                    }
+               return;
+            }
 
-			if (context.contains("/chooseTable") &&
-					tableDetails.containsKey("boardId") &&
-					tableDetails.containsKey("number") &&
-					callData.equals("/no")) {
+            if (context.contains("/menu") && tableDetails.containsKey("calculateId") && tableDetails.containsKey("clientsId") && !tableDetails.containsKey("categoryId")) {
+                try {
+                    List<Category> categories = sessionHandler.getCategoryList();
+                    List<Product> products = getListProductsByCategoryId(callData, categories);
+                    sendMessageWithTextAndInlineKeyboard(chatId, "Выберите продукт для добавления \n", getListProductNames(products), getListProductId(products));
+                    tableDetails.put("categoryId", callData);
+                } catch (IOException e) {
+                    sendMessageWithTextAndInlineKeyboard(chatId, "В кафе нет созданных продуктов!\n", CANCEL_BUTTON);
+                }
+                return;
+            }
 
-				sendMessageWithTextAndInlineKeyboard(chatId, "Хотите изменить время посадки? \n", CHANGE_SEAT_TIME_BUTTON, LEAVE_SEAT_TIME_BUTTON, CANCEL_BUTTON);
-				tableDetails.put("description", "");
-				return;
-			}
+            if (context.contains("/menu") && tableDetails.containsKey("calculateId") && tableDetails.containsKey("clientsId") && tableDetails.containsKey("categoryId")) {
+                tableDetails.put("productId", callData);
+                sessionHandler.sendRequestOnAddProductToClient(tableDetails);
+                sendMessageWithText(chatId, "Заказ ушел на стол");
+                //выходим из меню, но остаётся аунтификация
+                context.clear();
+                tableDetails.clear();
+                printMainMenu(chatId);
+                return;
+            }
 
-			if (context.contains("/chooseTable") &&
-					tableDetails.containsKey("boardId") &&
-					tableDetails.containsKey("number") &&
-					callData.equals("/change")) {
+            if (context.contains("/chooseTable") && !tableDetails.containsKey("boardId")) {
+                try {
+                    sendMessageWithTextAndInlineKeyboard(chatId, "Ок, сколько человек будет сидеть за столом " + sessionHandler.getBoardByName(callData) + "\n", CANCEL_BUTTON);
+                    tableDetails.put("boardId", sessionHandler.getBoardId(callData));
+                } catch (IOException e) {
+                    sendMessageWithText(chatId, "Смена еще не началась");
+                    return;
+                }
+                return;
+            }
 
-				sendMessageWithText(chatId, "Введите новое время в формате Часы:Минуты");
-				context.add("/change");
-				return;
-			}
+            /*if (tableDetails.containsKey("boardId") &&
+                    tableDetails.containsKey("number") &&
+                    callData.equals("/yes")) {
 
-			if (context.contains("/chooseTable") &&
-					tableDetails.containsKey("boardId") &&
-					tableDetails.containsKey("number") &&
-					callData.equalsIgnoreCase("/leave")) {
+                sendMessageWithTextAndInlineKeyboard(chatId, "Введите описание стола", CANCEL_BUTTON);
+                context.add("/yes");
+                return;
+            }*/
 
-				sessionHandler.sendRequestOnAddTable(tableDetails);
-				sendMessageWithText(chatId, "Счёт добавлен в систему");
-				//выходим из меню, но остаётся аунтификация
-				context.clear();
-				tableDetails.clear();
-				printMainMenu(chatId);
-				return;
-			}
-		}
-	}
+            /*if (context.contains("/chooseTable") &&
+                    tableDetails.containsKey("boardId") &&
+                    tableDetails.containsKey("number") &&
+                    callData.equals("/no")) {
 
-	private boolean correctValueOfPeople(String messageText) {
-		int value;
-		try {
-			value = Integer.valueOf(messageText);
-		} catch (NumberFormatException e) {
-			return false;
-		}
-		return value > 0 && value <= 100;
-	}
+                sendMessageWithTextAndInlineKeyboard(chatId, "Хотите изменить время посадки? \n", CHANGE_SEAT_TIME_BUTTON, LEAVE_SEAT_TIME_BUTTON, CANCEL_BUTTON);
+                tableDetails.put("description", "");
+                return;
+            }*/
 
-	private Map<String, String> parceInputTime(String hoursMinutes, Map<String, String> tableDetails) {
+            if (context.contains("/chooseTable") &&
+                    tableDetails.containsKey("boardId") &&
+                    tableDetails.containsKey("number") &&
+                    callData.equals("/change")) {
 
-		Pattern pattern = Pattern.compile("\\d{2}:\\d{2}");
-		Matcher matcher = pattern.matcher(hoursMinutes);
-		if (matcher.find()) {
-			String[] parceTime = matcher.group(0).split(":", 2);
-			int hour = Integer.parseInt(parceTime[0]);
-			int minutes = Integer.parseInt(parceTime[1]);
+                sendMessageWithText(chatId, "Введите новое время в формате Часы:Минуты");
+                context.add("/change");
+                return;
+            }
 
-			if (hour < 24 && minutes < 60) {
-				tableDetails.put("hours", parceTime[0]);
-				tableDetails.put("minutes", parceTime[1]);
-			}
-			return tableDetails;
-		} else {
-			return tableDetails;
-		}
-	}
+            if (context.contains("/chooseTable") &&
+                    tableDetails.containsKey("boardId") &&
+                    tableDetails.containsKey("number") &&
+                    callData.equalsIgnoreCase("/leave")) {
 
-	private void sendMessageWithText(Long chatId, String text) {
+                sessionHandler.sendRequestOnAddTable(tableDetails);
+                sendMessageWithText(chatId, "Счёт добавлен в систему");
+                //выходим из меню, но остаётся аунтификация
+                context.clear();
+                tableDetails.clear();
+                printMainMenu(chatId);
+                return;
+            }
+        }
+    }
 
-		SendMessage message = new SendMessage()
-				.setChatId(chatId)
-				.setText(text);
-		try {
-			sendMessage(message);
-		} catch (TelegramApiException e) {
-			logger.error("Error sending message" + e.getLocalizedMessage());
-		}
-	}
+    private boolean correctValueOfPeople(String messageText) {
+        int value;
+        try {
+            value = Integer.valueOf(messageText);
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        return value > 0 && value <= 100;
+    }
 
-	private void sendMessageWithTextAndInlineKeyboard(Long chatId, String messageText, List<String> inlineKeyboardText, List<String> callbackData) {
+    private Map<String, String> parceInputTime(String hoursMinutes, Map<String, String> tableDetails) {
 
-		SendMessage message = new SendMessage()
-				.setChatId(chatId)
-				.setText(messageText);
-		InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
-		List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
-		try {
-			for (int i = 0; i < inlineKeyboardText.size(); i++) {
-				List<InlineKeyboardButton> rowInline = new ArrayList<>();
-				rowInline.add(new InlineKeyboardButton().setText(inlineKeyboardText.get(i)).setCallbackData(callbackData.get(i)));
-				rowsInline.add(rowInline);
-			}
-		} catch (ArrayIndexOutOfBoundsException e) {
-			logger.error("Не правильно заполнен лист для кнопок: " + e.getLocalizedMessage());
-		}
-		markupInline.setKeyboard(rowsInline);
-		message.setReplyMarkup(markupInline);
-		try {
-			sendMessage(message);
-		} catch (TelegramApiException e) {
-			logger.error("Error sending message" + e.getLocalizedMessage());
-		}
-	}
+        Pattern pattern = Pattern.compile("\\d{2}:\\d{2}");
+        Matcher matcher = pattern.matcher(hoursMinutes);
+        if (matcher.find()) {
+            String[] parceTime = matcher.group(0).split(":", 2);
+            int hour = Integer.parseInt(parceTime[0]);
+            int minutes = Integer.parseInt(parceTime[1]);
 
-	private void sendMessageWithTextAndInlineKeyboard(Long chatId, String messageText, InlineKeyboardButton... buttons) {
+            if (hour < 24 && minutes < 60) {
+                tableDetails.put("hours", parceTime[0]);
+                tableDetails.put("minutes", parceTime[1]);
+            }
+            return tableDetails;
+        } else {
+            return tableDetails;
+        }
+    }
 
-		SendMessage message = new SendMessage()
-				.setChatId(chatId)
-				.setText(messageText);
-		InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
-		List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
-		try {
-			for (InlineKeyboardButton button : buttons) {
-				List<InlineKeyboardButton> rowInline = new ArrayList<>();
-				rowInline.add(button);
-				rowsInline.add(rowInline);
-			}
-		} catch (ArrayIndexOutOfBoundsException e) {
-			logger.error("Не правильно заполнен лист для кнопок: " + e.getLocalizedMessage());
-		}
-		markupInline.setKeyboard(rowsInline);
-		message.setReplyMarkup(markupInline);
-		try {
-			sendMessage(message);
-		} catch (TelegramApiException e) {
-			logger.error("Error sending message" + e.getLocalizedMessage());
-		}
-	}
+    private void sendMessageWithText(Long chatId, String text) {
 
-	private void printMainMenu(Long chatId) {
+        SendMessage message = new SendMessage()
+                .setChatId(chatId)
+                .setText(text);
+        try {
+            sendMessage(message);
+        } catch (TelegramApiException e) {
+            logger.error("Error sending message" + e.getLocalizedMessage());
+        }
+    }
 
-		sendMessageWithTextAndInlineKeyboard(chatId, "Вы находитесь в главном меню" + "\n"
-				+ "Вам доступны следующие команды: " + "\n", CHOOSE_TABLE_BUTTON, OUT_BUTTON);
-	}
+    private void sendMessageWithTextAndInlineKeyboard(Long chatId, String messageText, List<String> inlineKeyboardText, List<String> callbackData) {
 
-	private void printHelloOnStart(Long chatId) {
+        SendMessage message = new SendMessage()
+                .setChatId(chatId)
+                .setText(messageText);
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        try {
+            for (int i = 0; i < inlineKeyboardText.size(); i++) {
+                List<InlineKeyboardButton> rowInline = new ArrayList<>();
+                rowInline.add(new InlineKeyboardButton().setText(inlineKeyboardText.get(i)).setCallbackData(callbackData.get(i)));
+                rowsInline.add(rowInline);
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+            logger.error("Не правильно заполнен лист для кнопок: " + e.getLocalizedMessage());
+        }
+        markupInline.setKeyboard(rowsInline);
+        message.setReplyMarkup(markupInline);
+        try {
+            sendMessage(message);
+        } catch (TelegramApiException e) {
+            logger.error("Error sending message" + e.getLocalizedMessage());
+        }
+    }
 
-		sendMessageWithTextAndInlineKeyboard(chatId, "Вам нужно пройти аунтификацию при помощи команды: ", AUTH_BUTTON);
-	}
+    private void sendMessageWithTextAndInlineKeyboard(Long chatId, String messageText, InlineKeyboardButton... buttons) {
 
-	private void printOut(Long chatId) {
+        SendMessage message = new SendMessage()
+                .setChatId(chatId)
+                .setText(messageText);
+        InlineKeyboardMarkup markupInline = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rowsInline = new ArrayList<>();
+        try {
+            for (InlineKeyboardButton button : buttons) {
+                List<InlineKeyboardButton> rowInline = new ArrayList<>();
+                rowInline.add(button);
+                rowsInline.add(rowInline);
+            }
+        } catch (ArrayIndexOutOfBoundsException e) {
+            logger.error("Не правильно заполнен лист для кнопок: " + e.getLocalizedMessage());
+        }
+        markupInline.setKeyboard(rowsInline);
+        message.setReplyMarkup(markupInline);
+        try {
+            sendMessage(message);
+        } catch (TelegramApiException e) {
+            logger.error("Error sending message" + e.getLocalizedMessage());
+        }
+    }
 
-		sendMessageWithTextAndInlineKeyboard(chatId, "Все настройки сброшены чтобы начать работу авторизуйтесь: ", AUTH_BUTTON);
-	}
+    private void printMainMenu(Long chatId) {
 
-	@Override
-	public String getBotUsername() {
+        sendMessageWithTextAndInlineKeyboard(chatId, "Вы находитесь в главном меню" + "\n"
+                + "Вам доступны следующие команды: " + "\n", CHOOSE_TABLE_BUTTON, FOOD_MENU_BUTTON, OUT_BUTTON);
+    }
 
-		return "CAFEcrmBot";
-	}
+    private void printHelloOnStart(Long chatId) {
 
-	@Override
-	public String getBotToken() {
+        sendMessageWithTextAndInlineKeyboard(chatId, "Вам нужно пройти аутентификация при помощи команды: ", AUTH_BUTTON);
+    }
 
-		return "430590498:AAGCvzRsWL660e5NSgAeEDDxcQj8QH4Abb0";
-	}
+    private void printOut(Long chatId) {
+
+        sendMessageWithTextAndInlineKeyboard(chatId, "Все настройки сброшены чтобы начать работу авторизуйтесь: ", AUTH_BUTTON);
+    }
+
+    @Override
+    public String getBotUsername() {
+
+        return "CAFEcrmBot";
+    }
+
+    @Override
+    public String getBotToken() {
+
+        return "430590498:AAGCvzRsWL660e5NSgAeEDDxcQj8QH4Abb0";
+    }
 }
