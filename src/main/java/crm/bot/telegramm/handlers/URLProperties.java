@@ -20,6 +20,7 @@ public class URLProperties {
 	public String calculateList;
 	public String categoryList;
 	public String addProductToTable;
+	public String addProductWithFloatingPriceToTable;
 
 	public URLProperties() {
 		initProperty();
@@ -42,6 +43,7 @@ public class URLProperties {
 			calculateList = prefix + prop.getProperty("calculateList");
 			categoryList = prefix + prop.getProperty("categoryList");
 			addProductToTable = prefix + prop.getProperty("addProductToTable");
+			addProductWithFloatingPriceToTable = prefix + prop.getProperty("addProductWithFloatingPriceToTable");
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}

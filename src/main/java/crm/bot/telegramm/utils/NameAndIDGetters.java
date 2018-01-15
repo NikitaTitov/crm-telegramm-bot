@@ -18,7 +18,15 @@ public class NameAndIDGetters {
     }
 
     public static List<String> getListProductNames(List<Product> products) {
-        return products.stream().map(product -> product.getName() + " : " + String.valueOf(product.getCost()) + "p").collect(Collectors.toList());
+    	List<String> productNames = new ArrayList<>();
+    	for (Product product : products) {
+    		if (product.getCategory().isFloatingPrice()) {
+    			productNames.add(product.getName());
+			} else {
+    			productNames.add(product.getName() + " : " + String.valueOf(product.getCost()) + "p");
+			}
+		}
+        return productNames;
     }
 
     public static List<String> getListCalculateNames(Set<Calculate> calculates) {
@@ -33,7 +41,10 @@ public class NameAndIDGetters {
         List<Client> clients = new ArrayList<>();
         for (Calculate calculate : calculates) {
             if (calculate.getId().equals(Long.valueOf(calcId))) {
-                clients = calculate.getClient().stream().filter(client -> !(client.getDescription() == null || client.getDescription().isEmpty())).collect(Collectors.toList());
+                clients = calculate.getClient().stream()
+						.filter(client -> client.isState() && !client.isDeleteState())
+                        .filter(client -> !(client.getDescription() == null || client.getDescription().isEmpty()))
+						.collect(Collectors.toList());
                 }
             }
         return clients;
@@ -43,7 +54,9 @@ public class NameAndIDGetters {
         List<Client> clients = new ArrayList<>();
         for (Calculate calculate : calculates) {
             if (calculate.getId().equals(Long.valueOf(calcId))) {
-                return calculate.getClient();
+                return calculate.getClient().stream()
+						.filter(client -> client.isState() && !client.isDeleteState())
+						.collect(Collectors.toList());
             }
         }
         return clients;
@@ -65,10 +78,19 @@ public class NameAndIDGetters {
         return categories.stream().map(Category::getId).map(String::valueOf).collect(Collectors.toList());
     }
 
+    public static Category getCategory(String categoryId, List<Category> categories) throws IOException {
+		for (Category category : categories) {
+			if (category.getId().equals(Long.valueOf(categoryId))) {
+				return category;
+			}
+		}
+		throw new IOException("Category with id:" + categoryId + " has bean removed");
+	}
+
     public static List<Product> getListProductsByCategoryId(String categoryId, List<Category> categories) throws IOException {
         for (Category category : categories) {
             if (category.getId().equals(Long.valueOf(categoryId))) {
-                return category.getProducts();
+                return category.getProducts().stream().peek(p -> p.setCategory(category)).collect(Collectors.toList());
             }
         }
         throw new IOException("There is no table with " + categoryId + " category id");

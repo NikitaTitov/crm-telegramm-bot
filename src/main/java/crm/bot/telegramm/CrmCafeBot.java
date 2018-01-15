@@ -108,6 +108,16 @@ public class CrmCafeBot extends TelegramLongPollingBot {
                     context.remove("/change");
                 }
             }
+
+			if (context.contains("/menu") && tableDetails.containsKey("calculateId") && tableDetails.containsKey("clientsId") && tableDetails.containsKey("categoryId") && tableDetails.containsKey("productId")) {
+				tableDetails.put("productPrice", messageText);
+				sessionHandler.sendRequestOnAddProductWithFloatingPriceToClient(tableDetails);
+				sendMessageWithText(chatId, "Заказ ушел на стол");
+				//выходим из меню, но остаётся аунтификация
+				context.clear();
+				tableDetails.clear();
+				printMainMenu(chatId);
+			}
         } else if (update.hasCallbackQuery()) {
 
             String callData = update.getCallbackQuery().getData();
@@ -225,14 +235,24 @@ public class CrmCafeBot extends TelegramLongPollingBot {
                 return;
             }
 
-            if (context.contains("/menu") && tableDetails.containsKey("calculateId") && tableDetails.containsKey("clientsId") && tableDetails.containsKey("categoryId")) {
-                tableDetails.put("productId", callData);
-                sessionHandler.sendRequestOnAddProductToClient(tableDetails);
-                sendMessageWithText(chatId, "Заказ ушел на стол");
-                //выходим из меню, но остаётся аунтификация
-                context.clear();
-                tableDetails.clear();
-                printMainMenu(chatId);
+            if (context.contains("/menu") && tableDetails.containsKey("calculateId") && tableDetails.containsKey("clientsId") && tableDetails.containsKey("categoryId") && !tableDetails.containsKey("productId")) {
+				try {
+					List<Category> categories = sessionHandler.getCategoryList();
+					Category category = getCategory(tableDetails.get("categoryId"), categories);
+					tableDetails.put("productId", callData);
+					if (category.isFloatingPrice()) {
+						sendMessageWithText(chatId, "Введите цену");
+					} else {
+						sessionHandler.sendRequestOnAddProductToClient(tableDetails);
+						sendMessageWithText(chatId, "Заказ ушел на стол");
+						//выходим из меню, но остаётся аунтификация
+						context.clear();
+						tableDetails.clear();
+						printMainMenu(chatId);
+					}
+				} catch (IOException e) {
+					sendMessageWithTextAndInlineKeyboard(chatId, "Категория была удалена перед отправкой заказа!\n", CANCEL_BUTTON);
+				}
                 return;
             }
 
@@ -407,7 +427,7 @@ public class CrmCafeBot extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-
-        return "430590498:AAGCvzRsWL660e5NSgAeEDDxcQj8QH4Abb0";
+        return "372169972:AAHGBe36HPmH3vRo07UmwTvjU0Ho0wTOS8s"; //production token
+        //return "430590498:AAGCvzRsWL660e5NSgAeEDDxcQj8QH4Abb0";
     }
 }

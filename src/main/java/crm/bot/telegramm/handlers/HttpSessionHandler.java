@@ -135,19 +135,15 @@ public class HttpSessionHandler {
     }
 
     public void sendRequestOnAddProductToClient (Map<String, String> tableDetails) {
-        List<NameValuePair> params = new ArrayList<>(2);
-        if (tableDetails.get("clientsId").length() > 1) {
-            String[] ids = tableDetails.get("clientsId").replaceAll("]|\\[", "").split(",");
-            for (String id : ids) {
-                params.add(new BasicNameValuePair("clientsId", String.valueOf(id)));
-            }
-        } else {
-            params.add(new BasicNameValuePair("clientsId", tableDetails.get("clientsId")));
-        }
-        params.add(new BasicNameValuePair("calculateId", tableDetails.get("calculateId")));
-        params.add(new BasicNameValuePair("productId", tableDetails.get("productId")));
-
+        List<NameValuePair> params = getAddProductParam(tableDetails);
         sendPostRequest(params, new HttpPost(initProperty.addProductToTable));
+    }
+
+    public void sendRequestOnAddProductWithFloatingPriceToClient (Map<String, String> tableDetails) {
+        List<NameValuePair> params = getAddProductParam(tableDetails);
+		params.add(new BasicNameValuePair("productPrice", tableDetails.get("productPrice")));
+
+        sendPostRequest(params, new HttpPost(initProperty.addProductWithFloatingPriceToTable));
     }
 
     private void sendPostRequest(List<NameValuePair> params, HttpPost httpPost) {
@@ -205,6 +201,22 @@ public class HttpSessionHandler {
         }
         return lastId;
     }
+
+	private List<NameValuePair> getAddProductParam(Map<String, String> tableDetails) {
+		List<NameValuePair> params = new ArrayList<>(4);
+		if (tableDetails.get("clientsId").length() > 1) {
+			String[] ids = tableDetails.get("clientsId").replaceAll("]|\\[", "").split(",");
+			for (String id : ids) {
+				params.add(new BasicNameValuePair("clientsId", String.valueOf(id)));
+			}
+		} else {
+			params.add(new BasicNameValuePair("clientsId", tableDetails.get("clientsId")));
+		}
+		params.add(new BasicNameValuePair("calculateId", tableDetails.get("calculateId")));
+		params.add(new BasicNameValuePair("productId", tableDetails.get("productId")));
+
+		return params;
+	}
 
     private <T> Collection<T> sendGetRequest(Collection<T> collection, HttpGet httpGet, Class<T> typeParameterClass) {
         ObjectMapper objectMapper = new ObjectMapper();
