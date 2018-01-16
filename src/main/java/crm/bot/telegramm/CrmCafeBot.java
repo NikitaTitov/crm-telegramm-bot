@@ -21,6 +21,7 @@ import java.util.regex.Pattern;
 import static crm.bot.telegramm.handlers.ButtonsHandler.*;
 import static crm.bot.telegramm.handlers.UserHandler.isEmptyUser;
 import static crm.bot.telegramm.utils.NameAndIDGetters.*;
+import static crm.bot.telegramm.utils.Validators.*;
 
 public class CrmCafeBot extends TelegramLongPollingBot {
 
@@ -110,13 +111,17 @@ public class CrmCafeBot extends TelegramLongPollingBot {
             }
 
 			if (context.contains("/menu") && tableDetails.containsKey("calculateId") && tableDetails.containsKey("clientsId") && tableDetails.containsKey("categoryId") && tableDetails.containsKey("productId")) {
-				tableDetails.put("productPrice", messageText);
-				sessionHandler.sendRequestOnAddProductWithFloatingPriceToClient(tableDetails);
-				sendMessageWithText(chatId, "Заказ ушел на стол");
-				//выходим из меню, но остаётся аунтификация
-				context.clear();
-				tableDetails.clear();
-				printMainMenu(chatId);
+				if (isValidPrice(messageText)) {
+					tableDetails.put("productPrice", messageText);
+					sessionHandler.sendRequestOnAddProductWithFloatingPriceToClient(tableDetails);
+					sendMessageWithText(chatId, "Заказ ушел на стол");
+					//выходим из меню, но остаётся аунтификация
+					context.clear();
+					tableDetails.clear();
+					printMainMenu(chatId);
+				} else {
+					sendMessageWithTextAndInlineKeyboard(chatId, "Вы ввели некорректное число или слишком большую стоимость, попробуйте еще раз или вернитесь в меню\n", CANCEL_BUTTON);
+				}
 			}
         } else if (update.hasCallbackQuery()) {
 
